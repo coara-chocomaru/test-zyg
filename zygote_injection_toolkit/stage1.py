@@ -194,7 +194,7 @@ class Stage1Exploit:
             "--setgroups=3003",
             "--app-data-dir=/data/data/jp.kyocera.kdfs",
             "--runtime-args",
-            "--nice-name=kdfs_svc",
+            "--nice-name=jp.kyocera.kdfs",
             "--target-sdk-version=28",
             "--seinfo=platform",
             "--runtime-flags=1",
