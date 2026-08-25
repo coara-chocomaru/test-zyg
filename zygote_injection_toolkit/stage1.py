@@ -193,7 +193,6 @@ class Stage1Exploit:
             "--setgid=10011",
             "--setgroups=3003",
             "--target-sdk-version=28",
-            "--instruction-set=arm",
             "--app-data-dir=/data/user/0/com.android.providers.media",
             "--runtime-args",
             "--nice-name=com.android.providers.media",
