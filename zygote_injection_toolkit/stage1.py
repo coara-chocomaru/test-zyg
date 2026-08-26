@@ -192,7 +192,6 @@ class Stage1Exploit:
             "--setuid=1000",
             "--setgid=1000",
             "--setgroups=3003",
-            "--capabilities=4096,4096",
             "--target-sdk-version=28",
             "--app-data-dir=/data/system/",
             "--runtime-args",
