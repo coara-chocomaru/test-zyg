@@ -4,5 +4,5 @@ set +e
 export TMPDIR=/cache/
 
 base64 -d > /cache/command << 'B64EOF'
-LS1zaWRlbG9hZAo=
+Ym9vdC1yZWNvdmVyeQotLXNpZGVsb2FkCi0tcmV0cnlfY291bnQ9Mwo=
 B64EOF
