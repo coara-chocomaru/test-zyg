@@ -1,3 +1,3 @@
 boot-recovery
---sideload
+--adbd
 --retry_count=3
