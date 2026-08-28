@@ -1,6 +1,9 @@
-boot-recovery
---sideload
---show_text
---reason=kcpermissive
---adbd
+--bootloader
+--boot-bootloader
+--bootonce-bootloader
+--fastboot_please
 --retry_count=3
+bootloader
+boot-bootloader
+bootonce-bootloader
+retry_count=3
