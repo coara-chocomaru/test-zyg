@@ -1,3 +1,4 @@
+boot-recovery
 --bootloader
 --boot-bootloader
 --bootonce-bootloader
