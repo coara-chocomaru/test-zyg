@@ -1,10 +1,3 @@
 boot-recovery
---bootloader
---boot-bootloader
---bootonce-bootloader
---fastboot_please
---retry_count=3
-bootloader
-boot-bootloader
-bootonce-bootloader
-retry_count=3
+--sideload
+--adbd
