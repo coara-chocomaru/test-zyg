@@ -41,3 +41,15 @@ raw_zygote_arguments = [
             f"{command}#",
         ]
 
+#.dataservice
+raw_zygote_arguments = [
+            "--setuid=1000",
+            "--setgid=1000",
+            "--setgroups=3003",
+            "--runtime-args",
+            "--nice-name=.dataservices",
+            "--seinfo=platform:dataservice_app:complete",
+            "--runtime-flags=32767",
+            "--invoke-with",
+            f"{command}#",
+        ]
