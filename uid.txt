@@ -29,5 +29,15 @@ raw_zygote_arguments = [
         ]
 
 #nfc
-
+raw_zygote_arguments = [
+            "--setuid=1027",
+            "--setgid=1027",
+            "--setgroups=3003",
+            "--runtime-args",
+            "--nice-name=nfc",
+            "--seinfo=platform:nfc:complete",
+            "--runtime-flags=32767",
+            "--invoke-with",
+            f"{command}#",
+        ]
 
