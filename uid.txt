@@ -1,0 +1,33 @@
+#bluetooth
+raw_zygote_arguments = [
+            "--setuid=1002",
+            "--setgid=1002",
+            "--setgroups=3003",
+            "--target-sdk-version=28",
+            "--app-data-dir=/data/user/0/com.android.bluetooth",
+            "--runtime-args",
+            "--nice-name=bluetooth",
+            "--seinfo=platform:bluetooth:complete",
+            "--runtime-flags=1",
+            "--invoke-with",
+            f"{command}#",
+        ]
+
+#radio
+raw_zygote_arguments = [
+            "--setuid=1001",
+            "--setgid=1001",
+            "--setgroups=3003",
+            "--target-sdk-version=28",
+            "--app-data-dir=/data/user/0/com.android.phone",
+            "--runtime-args",
+            "--nice-name=radio",
+            "--seinfo=platform:radio:complete",
+            "--runtime-flags=1",
+            "--invoke-with",
+            f"{command}#",
+        ]
+
+#nfc
+
+
