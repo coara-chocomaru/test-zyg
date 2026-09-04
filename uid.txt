@@ -13,6 +13,19 @@ raw_zygote_arguments = [
             f"{command}#",
         ]
 
+#system
+raw_zygote_arguments = [
+            "--setuid=1000",
+            "--setgid=1000",
+            "--setgroups=3003",
+            "--runtime-args",
+            "--nice-name=system",
+            "--seinfo=platform:system_app:complete",
+            "--runtime-flags=32767",
+            "--invoke-with",
+            f"{command}#",
+        ]
+
 #radio
 raw_zygote_arguments = [
             "--setuid=1001",
